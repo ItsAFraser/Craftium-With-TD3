@@ -1,7 +1,23 @@
+[build-system]
+requires = ["setuptools>=66.1.1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "craftium-with-td3"
 version = "0.1.0"
-description = "Add your description here"
+description = "Training and benchmarking workspace for Craftium experiments with TD3"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+	"craftium",
+	"numpy>=2.0.1",
+	"stable-baselines3>=2.3.2",
+	"torch>=2.6.0",
+	"tyro>=0.8.5",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+craftium = { path = "craftium", editable = true }
