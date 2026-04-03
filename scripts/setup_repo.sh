@@ -51,3 +51,4 @@ ensure_repo() {
 
 ensure_repo "TD3" "$TD3_DIR" https://github.com/sfujim/TD3.git
 ensure_repo "Craftium" "$CRAFTIUM_DIR" --recurse-submodules https://github.com/mikelma/craftium.git
+ensure_repo "Luanti" "$PROJECT_ROOT/luanti" https://github.com/luanti-org/luanti.git
