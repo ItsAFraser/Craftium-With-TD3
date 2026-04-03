@@ -16,7 +16,7 @@ COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # we copy the code last since it is changed the most
-COPY main.py ./
+COPY . .
 
 # this commands runs in the directory given by WORKDIR earlier
 CMD ["python", "./main.py"]

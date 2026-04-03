@@ -2,7 +2,7 @@ def main():
     print("Hello from craftium-with-td3!")
 
     import gymnasium as gym
-    from . import craftium
+    from craftium import craftium
 
     env = gym.make("Craftium/ChopTree-v0")
 
