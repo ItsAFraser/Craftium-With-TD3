@@ -1,0 +1,31 @@
+# build containers with
+#docker compose up -d --build
+
+# take down with (-v takes down volumes)
+#docker compose down -v
+
+# restart all running containers
+#docker compose restart
+
+# check status with
+#docker compose ps
+
+# read logs for <container-name> with
+#docker logs <container-name>
+
+# to make the current terminal open in <container-name>
+#docker exec -it <container-name> /bin/bash
+
+services:
+  craftium:
+    container_name: craft # shortened so it can be typed with one hand :p
+    build:
+      context: .
+      dockerfile: craftium/Dockerfile.craftium
+  app:
+    container_name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes: # this makes development easier by reflecting changes in the code immediately in the container
+      - .:/app
