@@ -1,1 +1,2 @@
-gymnasium
+matplotlib
+numpy
