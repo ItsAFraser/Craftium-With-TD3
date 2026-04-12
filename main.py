@@ -1,12 +1,15 @@
 def main():
     print("Hello from craftium-with-td3!")
 
+    from pathlib import Path
     import matplotlib.pyplot as plt
     import numpy as np
     import gymnasium as gym
     import craftium
 
-    env = gym.make("Craftium/ChopTree-v0")
+    Path("results").mkdir(parents=True, exist_ok=True)
+
+    env = gym.make("Craftium/ChopTree-v0", run_dir_prefix="results")
 
     observation, info = env.reset()
 

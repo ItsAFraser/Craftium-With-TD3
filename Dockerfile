@@ -1,33 +1,56 @@
 # to build the image
-#docker build -t craftium-manylinux .
-#  -t tags the image with a name (craftium-manylinux)
+#docker build -t craftium-with-td3 .
 
 # to run the container
-#docker run --rm -v .:/app --name craft craftium-manylinux
-#  --rm automatically removes the container when it exits (docker will freak out if you try to run it again without this since the container already exists)
-#  -v mounts the current directory (.) to /app in the container, allowing access to files inside the container (how we view saved observations)
-#  --name gives the container a name (craft) for easier reference (like checking logs with "docker logs craft")
+#docker run --rm --name app craftium-with-td3
 
-FROM quay.io/pypa/manylinux_2_28_x86_64:latest
+FROM python:3.12-slim
 
-ENV PIP=/opt/python/cp312-cp312/bin/pip
-ENV PYTHON=/opt/python/cp312-cp312/bin/python
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-RUN yum install -y mesa-dri-drivers mesa-libEGL mesa-libGL
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    cmake \
+    git \
+    g++ \
+    gettext \
+    libcurl4-gnutls-dev \
+    libfreetype6-dev \
+    libgl1-mesa-dev \
+    libgmp-dev \
+    libjpeg-dev \
+    libjsoncpp-dev \
+    libluajit-5.1-dev \
+    libogg-dev \
+    libopenal-dev \
+    libpng-dev \
+    libsqlite3-dev \
+    libvorbis-dev \
+    libzstd-dev \
+    make \
+    pkg-config \
+    wget \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s $PYTHON /usr/local/bin/python && \
-    ln -s $PIP /usr/local/bin/pip
+COPY craftium /tmp/craftium
+RUN cd /tmp/craftium \
+    && if [ ! -f craftium-envs/minetest_game/game.conf ]; then \
+        rm -rf craftium-envs/minetest_game \
+        && git clone --depth 1 https://github.com/luanti-org/minetest_game.git craftium-envs/minetest_game; \
+    fi \
+    && bash build_sdl2.sh \
+    && bash build_craftium.sh \
+    && pip install --no-cache-dir . \
+    && rm -rf /tmp/craftium
 
-RUN pip install --upgrade pip
-
-RUN pip install https://github.com/mikelma/craftium/releases/download/v0.0.1/craftium-0.0.1-cp312-cp312-manylinux_2_28_x86_64.whl
-
-# copy first to make use of Docker cache for pip install
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /app
+COPY main.py main.py
+
+RUN mkdir -p /app/results /app/logs
 
 CMD ["python", "./main.py"]

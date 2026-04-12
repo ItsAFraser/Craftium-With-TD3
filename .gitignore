@@ -11,12 +11,21 @@ __pycache__/
 .DS_Store
 
 #Environment files
+.venv/
 venv/
 
 #Sensitive files
 .env
 
+luanti-run-*/
+
 results/visualizations/*
 results/raw/swebench/*
 results/raw/livecodebench/*
 results/metrics/*
+
+*.glsl
+*.fsh
+*.libs
+*.conf
+*.tr
