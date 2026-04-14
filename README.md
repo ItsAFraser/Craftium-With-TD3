@@ -106,6 +106,25 @@ Craftium depends on Luanti and native build dependencies. On a fresh machine, Py
 - [craftium/doc/compiling/macos.md](./craftium/doc/compiling/macos.md)
 - [craftium/doc/compiling/linux.md](./craftium/doc/compiling/linux.md)
 
+## Docker Build
+
+The root [Dockerfile](./Dockerfile) now clones Craftium during image build, so a local [craftium](./craftium) checkout is optional for Docker workflows.
+
+Build with default Craftium source (`main` branch):
+
+```bash
+docker build -t craftium-with-td3 .
+```
+
+Build with a specific Craftium ref:
+
+```bash
+docker build \
+	--build-arg CRAFTIUM_REPO=https://github.com/mikelma/craftium.git \
+	--build-arg CRAFTIUM_REF=main \
+	-t craftium-with-td3 .
+```
+
 ## Running Baselines
 
 ### Run the upstream TD3 benchmark code
