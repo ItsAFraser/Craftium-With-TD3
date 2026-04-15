@@ -40,7 +40,7 @@ def parse_args():
 This gym wrapper is in part derived from this tutorial/learning resource:
 https://alexandervandekleut.github.io/gym-wrappers/ 
 '''
-class ObersavtionSaverWrapper(gym.Wrapper): # TODO: Is gym.ObservationWrapper better?
+class ObservationSaverWrapper(gym.Wrapper): # TODO: Is gym.ObservationWrapper better?
     def __init__(self, env):
         super().__init__(env)
         self.steps = 0 # Used in step() below
@@ -57,11 +57,9 @@ class ObersavtionSaverWrapper(gym.Wrapper): # TODO: Is gym.ObservationWrapper be
         obs, reward, terminated, truncated, info = self.env.step(action)
         self.steps += 1
 
-        # This controls how often observations/frames are saved. I was worried the saving would slow down the training
-        # too much, but it seemed to have very little impact, so I'm just saving every frame. However, be warned that
-        # these frames quickly add up in space (6000 frames was ~120MB!)
-        if self.steps % 1 == 0:
-            self.save(obs)
+        # Saves every frame. Change to e.g. `if self.steps % 100 == 0:` to reduce disk usage.
+        # Warning: frames add up fast — 6000 frames was ~120MB!
+        self.save(obs)
 
         return obs, reward, terminated, truncated, info
 
@@ -94,15 +92,18 @@ class FixObsSpaceWrapper(gym.ObservationWrapper):
 
 
 '''
-This gym wrapper converts TD3's continuous outputs to Craftium's discrete action space
-using a trainable neural network.
+This gym wrapper converts TD3's continuous action scores to Craftium's discrete action space.
+Any action whose score exceeds 0.0 fires, so the agent can press multiple buttons simultaneously
+(e.g. forward + dig at the same time), which is required for ChopTree.
 '''
 class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
-    """Converts TD3 mapped action scores to discrete Craftium actions."""
+    """Converts TD3 mapped action scores to Craftium actions via per-action threshold."""
 
     def __init__(self, env, num_actions=18):
         super().__init__(env)
-        # The number of discrete actions (e.g., 18 for OpenWorld) that TD3 will output scores for. The wrapper will take the argmax of these scores to determine which discrete action to take. The remaining dimensions of the action vector are reserved for continuous mouse control, which is passed through directly without discretization.
+        # Number of discrete actions (e.g., 18 for OpenWorld). Any action whose score exceeds
+        # 0.0 fires, allowing simultaneous button presses. The remaining 2 dimensions are
+        # reserved for continuous mouse control, which passes through without discretization.
         self.num_actions = num_actions
 
         # Action vector layout (output by JointGaussianMapperActor):
@@ -123,7 +124,8 @@ class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
             "slot_6", "slot_7", "slot_8", "slot_9",
         ]
         assert len(self.action_names) == self.num_actions
-
+    
+    # The action method converts the continuous action vector from TD3 into a discrete action dictionary that Craftium can use. 
     def action(self, action):
         """Convert TD3 mapped action-score vector into Craftium action dict."""
         # Sanity check on input shape. Should be (num_actions + 2,) where last 2 are mouse control.
@@ -134,19 +136,27 @@ class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
         action_scores = action[:self.num_actions]
         mouse_vals = action[self.num_actions:self.num_actions + 2]
 
-        # Discrete action is the one with the highest score. This is a simple argmax, but more complex mappings could be learned by modifying the NN architecture and this wrapper.
-        discrete_idx = int(np.argmax(action_scores))
-
-        # Map the discrete index to the corresponding action name and set it to 1 in the action dict. All other actions are implicitly 0 (not taken).
+        # Fire every action whose score exceeds the threshold. Unlike argmax (which picks
+        # exactly one action), this allows simultaneous presses, critical for tasks that
+        # require holding forward and dig at the same time.
         action_dict = {}
-        if discrete_idx < len(self.action_names):
-            action_dict[self.action_names[discrete_idx]] = 1
+        for i, score in enumerate(action_scores):
+            if score > 0.0:
+                action_dict[self.action_names[i]] = 1
 
         # Keep mouse control continuous as requested.
         action_dict["mouse"] = np.array(mouse_vals, dtype=np.float32)
         return action_dict
 
+
+#the Make_env function creates a factory function that initializes the environment
+#with the appropriate wrappers based on the specified method (PPO, A2C, or TD3).
+#For TD3, it layers the FixObsSpaceWrapper and ContinuousToDiscreteActionWrapper on 
+#top of the base Craftium environment to ensure compatibility with TD3's requirements.
 def make_env(env_id, method, num_actions=18):
+    '''
+    Factory function to create environment initializer with appropriate wrappers based on method (PPO, A2C, or TD3).
+    '''
     def _init():
         # set up the environment
         craftium_kwargs: dict[str, Any] = dict(
@@ -159,7 +169,7 @@ def make_env(env_id, method, num_actions=18):
         
         env = gym.make(env_id, **craftium_kwargs)
         # Uncomment this for saving observations to file! Be warned it takes up quite a bit of space!
-        # env = ObersavtionSaverWrapper(env)
+        # env = ObservationSaverWrapper(env)
         # For TD3, bypass the DiscreteActionWrapper that Craftium bakes into its registered envs.
         # That wrapper expects an integer, but our ContinuousToDiscreteActionWrapper outputs a dict.
         # Unwrapping gives us CraftiumEnv directly (accepts dict actions), then we layer our
@@ -170,41 +180,49 @@ def make_env(env_id, method, num_actions=18):
             env = ContinuousToDiscreteActionWrapper(env, num_actions=num_actions)
         else:
             env = FixObsSpaceWrapper(env)
-        env.reset()
+        # Note: do NOT call env.reset() here — DummyVecEnv calls reset() on each env itself.
 
         return env
     return _init
 
+#Main training Loop. Configures the logger, creates the vectorized environment with the appropriate wrappers
+#initializes the model based on a specific method (PPO., A2C, or TD3), and starts the learning process for a given number ot timesteps.
 if __name__ == "__main__":
     args = parse_args()
 
+    # Generate a unique run name if not provided, and configure the SB3 logger to save logs in the specified directory.
     if args.run_name is None:
         run_name = f"{args.env_id.replace('/', '-')}-{args.method}--{str(uuid4())}"
     else:
         run_name = args.run_name
 
     # configure SB3 logger
-    log_path = os.path.join(args.runs_dir, run_name)
+    log_path = os.path.join(args.runs_dir, run_name) # save logs in runs_dir/run_name
     print(f"** Storing run's data in {log_path}")
-    new_logger = logger.configure(log_path, ["stdout", "csv"])
+    new_logger = logger.configure(log_path, ["stdout", "csv"]) # log to both console and CSV file for later analysis
 
-    envs = DummyVecEnv([make_env(args.env_id, args.method, num_actions=18) for _ in range(args.num_envs)])
-    envs = VecFrameStack(envs, 3)
-    envs = VecMonitor(envs)
+    envs = DummyVecEnv([make_env(args.env_id, args.method, num_actions=18) for _ in range(args.num_envs)]) # Create a vectorized environment with the specified number of parallel environments, each initialized with the appropriate wrappers based on the method.
+    envs = VecFrameStack(envs, 3) #stack the last 3 frames together to give agent temporal context. helps with tasks that require understanding of motion or change over time.
+    envs = VecMonitor(envs) # Monitor wrapper to track episode rewards, lengths, and other metrics across the vectorized environments. 
 
+
+    #if PPO or A2C, initialize with the standard CNN policy. if TD3, initialize with the custom JointGaussianMapperTD3Policy
+    #that maps CNN features to continuous action scores, which are then converted to discrete actions by the ContinuousToDiscreteActionWrapper.
     if args.method == "ppo":
         model = PPO("CnnPolicy", envs, verbose=1)
     elif args.method == "a2c":
         model = A2C("CnnPolicy", envs, verbose=1)
     else:  # TD3
-        # TD3 actor now predicts mean/variance internally and maps latent samples through
-        # a trainable NN to action scores. Wrapper discretizes via argmax + mouse passthrough.
+        # TD3 actor deterministically maps CNN features through a trainable NN to action
+        # scores. Wrapper fires all actions above 0.0 threshold + mouse passthrough.
         if not isinstance(envs.action_space, spaces.Box):
             raise TypeError(f"TD3 requires a Box action space, got {type(envs.action_space)}")
         n_actions = envs.action_space.shape[0]  # Should be 20 (18 actions + 2 mouse)
+        # Sigma reduced to 0.05 because the actor is now deterministic — exploration comes
+        # from this noise only (no internal Gaussian sampling adding on top).
         action_noise = NormalActionNoise(
             mean=np.zeros(n_actions),
-            sigma=0.1 * np.ones(n_actions),
+            sigma=0.05 * np.ones(n_actions),
         )
 
         # TD3 hyperparameters! Mostly found in td3.py in the SB3 repo, but I decreased some in a somewhat vain
@@ -214,12 +232,12 @@ if __name__ == "__main__":
             JointGaussianMapperTD3Policy,
             envs,
             action_noise = action_noise,
-            verbose = 1,
-            learning_starts = 1_000,
-            buffer_size = 10_000,  # Grayscale (H,W,1) + frame stack makes this ~1.7GB — fits in Docker RAM
-            batch_size = 64,
-            train_freq = 1,
-            gradient_steps = 1,
+            verbose = 1, # Print TD3's own debug info (e.g. actor/critic losses) to console. 1 is SB3's default; 0 would disable, 2 would be more verbose.
+            learning_starts = 1_000, # Number of steps to collect transitions with the untrained policy before starting to update the networks. 
+            buffer_size = 100_000,  # Size of the Replay Buffer. 
+            batch_size = 64, # Number of samples per batch for each training step.
+            train_freq = 1, # Frequency of training steps (in environment steps).
+            gradient_steps = 1, # Number of gradient steps per training step.
         )
     model.set_logger(new_logger)
 

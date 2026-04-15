@@ -1,4 +1,4 @@
-"""Custom TD3 policy with Gaussian latent sampling and a trainable action mapper."""
+"""Custom TD3 policy with a deterministic feature mapper for Craftium action scores."""
 
 import torch as th
 import torch.nn as nn
@@ -9,7 +9,9 @@ from stable_baselines3.td3.policies import Actor, TD3Policy
 
 class JointGaussianMapperActor(Actor):
     """
-    TD3 actor that predicts Gaussian parameters and maps samples to Craftium action scores.
+    Deterministic TD3 actor that passes CNN features through a trainable mapper
+    to produce Craftium action scores. No internal Gaussian sampling — consistent
+    with TD3's deterministic policy assumption.
 
     Output layout expected by the env wrapper:
     - first N dims: mapped action scores in [-1, 1] (N = num_discrete_actions)
@@ -28,13 +30,13 @@ class JointGaussianMapperActor(Actor):
         # -2 because last 2 are reserved for mouse control, which is continuous and not part of the discrete action set
         self.num_discrete_actions = action_dim - 2
 
-        # Heads operating directly on extracted features. This keeps the mapper differentiable
-        # and trainable through TD3's actor objective.
+        # Linear projection from CNN features to the discrete-action latent space.
+        # Kept separate from the mapper so the projection is directly supervised by the TD3 actor loss.
         self.mean_head = nn.Linear(self.features_dim, self.num_discrete_actions)
-        self.log_var_head = nn.Linear(self.features_dim, self.num_discrete_actions)
-        # Mouse control is continuous and passed through directly, so we have a separate head for it.
+        # Mouse control is continuous and passed through directly, so it has its own head.
         self.mouse_head = nn.Linear(self.features_dim, 2)
-    # The mapper takes the sampled latent vector and produces action scores for the discrete actions.
+        # The mapper adds representational depth between the feature projection and the final action
+        # scores without introducing stochasticity.
         self.mapper = nn.Sequential(
             nn.Linear(self.num_discrete_actions, latent_hidden_size),
             nn.ReLU(),
@@ -46,16 +48,11 @@ class JointGaussianMapperActor(Actor):
     def forward(self, obs: th.Tensor) -> th.Tensor:
         features = self.extract_features(obs, self.features_extractor)
 
-        # Gaussian parameters from actor features
-        means = th.tanh(self.mean_head(features))
-        log_vars = th.clamp(self.log_var_head(features), min=-6.0, max=2.0)
+        # Deterministic feature projection — no sampling, consistent with TD3's
+        # deterministic policy assumption. Exploration comes from NormalActionNoise only.
+        latent = th.tanh(self.mean_head(features))
 
-        # Reparameterization: z = mu + sigma * eps
-        std = th.exp(0.5 * log_vars)
-        eps = th.randn_like(std)
-        latent = means + std * eps
-
-        # Trainable mapper from latent continuous domain to action scores
+        # Trainable mapper from feature projection to action scores.
         action_scores = th.tanh(self.mapper(latent))
         mouse = th.tanh(self.mouse_head(features))
 
