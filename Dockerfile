@@ -57,7 +57,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py main.py
 COPY sb3_train_td3.py sb3_train_td3.py
 COPY td3_joint_policy.py td3_joint_policy.py
-COPY craftium_action_converter.py craftium_action_converter.py
 
 RUN mkdir -p /app/results /app/logs
 

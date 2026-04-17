@@ -18,7 +18,7 @@ class JointGaussianMapperActor(Actor):
     - last 2 dims: continuous mouse x/y in [-1, 1]
     """
 
-    def __init__(self, *args, latent_hidden_size: int = 128, **kwargs):
+    def __init__(self, *args, latent_hidden_size: int = 64, **kwargs):
         super().__init__(*args, **kwargs)
 
         if not isinstance(self.action_space, spaces.Box):
@@ -48,7 +48,7 @@ class JointGaussianMapperActor(Actor):
     def forward(self, obs: th.Tensor) -> th.Tensor:
         features = self.extract_features(obs, self.features_extractor)
 
-        # Deterministic feature projection — no sampling, consistent with TD3's
+        # Deterministic feature projection, no sampling, consistent with TD3's
         # deterministic policy assumption. Exploration comes from NormalActionNoise only.
         latent = th.tanh(self.mean_head(features))
 
