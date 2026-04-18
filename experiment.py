@@ -27,7 +27,8 @@ METHODS = [
     "ppo",
     "a2c"
 ]
-# Hardcoded action spaces for TD3. Taken from craftium docs (mouse control is always 4 here so it is not specified)
+# Hardcoded action spaces for TD3. "nop" is not here since Craftium handles it automatically when no other actions are specified
+# Taken from craftium docs (mouse control is always 4 here so it is not specified)
 ACTION_SPACES = {
     "Craftium/ChopTree-v0": ["forward", "jump", "dig"],
     "Craftium/Speleo-v0": ["forward", "jump"]
