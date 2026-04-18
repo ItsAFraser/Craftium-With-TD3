@@ -14,6 +14,7 @@ import os
 import craftium # This import is used even though the VSCode says it isn't!
 import matplotlib.pyplot as plt
 
+from td3_gumbel import GumbelMapperTD3Policy
 from td3_joint_policy import JointGaussianMapperTD3Policy
 
 def parse_args():
@@ -367,8 +368,9 @@ if __name__ == "__main__":
     # configure SB3 logger
     log_path = os.path.join(args.runs_dir, run_name) # save logs in runs_dir/run_name
     print(f"** Storing run's data in {log_path}")
-    new_logger = logger.configure(log_path, ["stdout", "csv"]) # log to both console and CSV file for later analysis
+    new_logger = logger.configure(log_path, ["stdout", "csv"])  # log to both console and CSV file for later analysis
 
+    print(f"Using method {args.method} with {args.total_timesteps} timesteps")
     envs = DummyVecEnv([
         make_env(
             args.env_id,
@@ -408,10 +410,10 @@ if __name__ == "__main__":
         # attempt to help speed up training.
         # https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/td3/td3.py
         model = TD3(
-            JointGaussianMapperTD3Policy,
+            GumbelMapperTD3Policy,
             envs,
             learning_rate=args.td3_learning_rate,
-            action_noise = action_noise,
+            #action_noise = action_noise, # remove noise since gumbel does this already
             verbose = 1, # Print TD3's own debug info (e.g. actor/critic losses) to console. 1 is SB3's default; 0 would disable, 2 would be more verbose.
             learning_starts = args.td3_learning_starts,
             buffer_size = args.td3_buffer_size,
