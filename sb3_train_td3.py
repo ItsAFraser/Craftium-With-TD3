@@ -14,7 +14,7 @@ import os
 import craftium # This import is used even though the VSCode says it isn't!
 import matplotlib.pyplot as plt
 
-from td3_gumbel import GumbelMapperTD3Policy
+from td3_gumbel_policy import GumbelMapperTD3Policy
 from td3_joint_policy import JointGaussianMapperTD3Policy
 
 def parse_args():

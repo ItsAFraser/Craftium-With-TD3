@@ -55,10 +55,12 @@ COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py main.py
-COPY misc.py misc.py
+COPY experiment.py experiment.py
+COPY gumbel_softmax.py gumbel_softmax.py
 COPY sb3_train_td3.py sb3_train_td3.py
 COPY td3_joint_policy.py td3_joint_policy.py
+COPY td3_gumbel_policy.py td3_gumbel_policy.py
 
 RUN mkdir -p /app/results /app/logs
 
-CMD ["python", "./sb3_train_td3.py", "--method", "td3", "--total-timesteps", "50_000", "--runs-dir", "./run-logs/td3-gumbel", "--run-name", "new_run", "--num-envs", "1"]
+CMD ["python", "./sb3_train_td3.py", "--method", "td3", "--total-timesteps", "50_000", "--runs-dir", "./run-logs/td3-gumbel", "--run-name", "new_run", "--num-envs", "1", "--env-id", "Craftium/Speleo-v0"]
