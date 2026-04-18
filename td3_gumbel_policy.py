@@ -3,10 +3,9 @@
 import torch as th
 import torch.nn as nn
 from gymnasium import spaces
-
 from stable_baselines3.td3.policies import Actor, TD3Policy
-from gumbel_softmax import gumbel_softmax
 
+from gumbel_softmax import gumbel_softmax
 
 class GumbelMapperActor(Actor):
     """
@@ -17,7 +16,7 @@ class GumbelMapperActor(Actor):
 
     Output layout expected by the env wrapper:
     - first N dims: mapped action scores in [-1, 1] (N = num_discrete_actions)
-    - last 2 dims: continuous mouse x/y in [-1, 1]
+    - last 4 dims: continuous mouse x/y in [-1, 1]
     """
 
     def __init__(self, *args, latent_hidden_size: int = 64, **kwargs):
@@ -27,16 +26,17 @@ class GumbelMapperActor(Actor):
             raise TypeError("GumbelMapperActor requires a Box action space")
 
         action_dim = self.action_space.shape[0]
-        if action_dim < 3:
-            raise ValueError("Action dim must be >= 3 (at least one discrete action + mouse x/y)")
-        # -2 because last 2 are reserved for mouse control, which is continuous and not part of the discrete action set
-        self.num_discrete_actions = action_dim - 2
+        if action_dim < 5:
+            raise ValueError("Action dim must be >= 5 (at least one discrete action + mouse x/y)")
+        # -4 because last 4 are reserved for mouse control, which is continuous and not part of the discrete action set
+        # (note this is not the case for Room and Small room which have only have +/- x)
+        self.num_discrete_actions = action_dim - 4
 
         # Linear projection from CNN features to the discrete-action latent space.
         # Kept separate from the mapper so the projection is directly supervised by the TD3 actor loss.
         self.mean_head = nn.Linear(self.features_dim, self.num_discrete_actions)
         # Mouse control is continuous and passed through directly, so it has its own head.
-        self.mouse_head = nn.Linear(self.features_dim, 2)
+        self.mouse_head = nn.Linear(self.features_dim, 4) # 2 for mouse +/- x and 2 for +/- y
         # The mapper adds representational depth between the feature projection and the final action
         # scores without introducing stochasticity.
         self.mapper = nn.Sequential(

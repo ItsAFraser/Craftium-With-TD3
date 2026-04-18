@@ -27,6 +27,11 @@ METHODS = [
     "ppo",
     "a2c"
 ]
+# Hardcoded action spaces for TD3. Taken from craftium docs (mouse control is always 4 here so it is not specified)
+ACTION_SPACES = {
+    "Craftium/ChopTree-v0": ["forward", "jump", "dig"],
+    "Craftium/Speleo-v0": ["forward", "jump"]
+}
 
 # TD3 Constants
 TD3_ACTION_THRESHOLD = 0.2
@@ -41,8 +46,6 @@ def parse_args():
     parser = ArgumentParser()
 
     # fmt: off
-    parser.add_argument("--run-name", type=str, default="",
-        help="Appends method name + env name")
     parser.add_argument("--runs-dir", type=str, default="./run-logs/",
         help="Name of the directory where run's data is stored. Defaults to './run-logs/'")
     parser.add_argument("--env-id", type=str, default="Craftium/ChopTree-v0",
@@ -55,20 +58,31 @@ def parse_args():
 def main():
     args = parse_args()
 
+    # get actions for this environment
+    td3_action_names = ACTION_SPACES.get(args.env_id, None)
+    if td3_action_names is None:
+        raise ValueError(f"Unsupported env_id {args.env_id}. Supported envs are: {list(ACTION_SPACES.keys())}")
+    
+    # turn into Box
+    td3_action_names = [a.strip() for a in td3_action_names if a.strip()]
+    if not td3_action_names:
+        raise ValueError("td3_action_names must include at least one action")
+
     for method in METHODS:
-        # Generate a unique run name if not provided
-        run_name = args.run_name + f"{method.__name__}_{args.env_id}" if args.run_name else f"{method.__name__}_{args.env_id}_{uuid4().hex[:8]}"
+        # Generate a unique directory name if not provided
+        runs_dir = args.runs_dir if args.runs_dir != "./run-logs/" else f"./run-logs/{uuid4()}"
 
         # configure SB3 logger
-        log_path = os.path.join(args.runs_dir, run_name) # save logs in runs_dir/run_name
-        new_logger = logger.CSVOutputFormat(log_path) # log to just CSV (hopefully is faster)
+        log_path = os.path.join(runs_dir, method) # save logs in runs_dir/run_name
+        new_logger = logger.configure(log_path, ["stdout", "csv"])  # log to both console and CSV file for later analysis
 
         # Create a vectorized environment with the specified number of parallel environments, each initialized with the appropriate wrappers based on the method.
-        print(f"Using method {args.method} with {args.total_timesteps} timesteps")
+        print(f"Using env {args.env_id} with method {method} and {args.total_timesteps} timesteps")
         envs = DummyVecEnv([
             make_env(
                 args.env_id,
                 method,
+                td3_action_names=td3_action_names,
                 td3_action_threshold=TD3_ACTION_THRESHOLD,
                 frameskip=FRAMESKIP,
                 sync_mode=SYNC_MODE,
@@ -81,9 +95,9 @@ def main():
 
         #if PPO or A2C, initialize with the standard CNN policy. if TD3, initialize with the custom JointGaussianMapperTD3Policy
         #that maps CNN features to continuous action scores, which are then converted to discrete actions by the ContinuousToDiscreteActionWrapper.
-        if args.method == "ppo":
+        if method == "ppo":
             model = PPO("CnnPolicy", envs, verbose=1)
-        elif args.method == "a2c":
+        elif method == "a2c":
             model = A2C("CnnPolicy", envs, verbose=1)
         else:  # TD3
             # TD3 actor deterministically maps CNN features through a trainable NN to action

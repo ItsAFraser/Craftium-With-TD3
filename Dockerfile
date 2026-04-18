@@ -63,4 +63,5 @@ COPY td3_gumbel_policy.py td3_gumbel_policy.py
 
 RUN mkdir -p /app/results /app/logs
 
-CMD ["python", "./sb3_train_td3.py", "--method", "td3", "--total-timesteps", "50_000", "--runs-dir", "./run-logs/td3-gumbel", "--run-name", "new_run", "--num-envs", "1", "--env-id", "Craftium/Speleo-v0"]
+#CMD ["python", "./sb3_train_td3.py", "--method", "td3", "--total-timesteps", "50_000", "--runs-dir", "./run-logs/td3-gumbel", "--run-name", "new_run", "--num-envs", "1", "--env-id", "Craftium/Speleo-v0"]
+CMD ["python", "./experiment.py", "--runs-dir", "./run-logs/Speleo-50k", "--env-id", "Craftium/Speleo-v0"]

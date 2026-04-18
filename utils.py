@@ -66,7 +66,7 @@ class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
 
     def __init__(self, env, action_names, action_threshold=0.2):
         super().__init__(env)
-        # Number of discrete actions controlled by TD3. The remaining 2 dimensions are
+        # Number of discrete actions controlled by TD3. The remaining 4 dimensions are
         # reserved for continuous mouse control, which passes through without discretization.
         self.action_names = list(action_names)
         self.num_actions = len(self.action_names)
@@ -76,24 +76,24 @@ class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
 
         # Action vector layout (output by JointGaussianMapperActor):
         # [0:num_actions] -> mapped action scores in [-1, 1]
-        # [num_actions:num_actions+2] -> mouse x,y (continuous pass-through)
+        # [num_actions:num_actions+4] -> mouse x,y (continuous pass-through)
         self.action_space = spaces.Box(
             low=-1.0,
             high=1.0,
-            shape=(self.num_actions + 2,),
+            shape=(self.num_actions + 4,),
             dtype=np.float32
         )
     
     # The action method converts the continuous action vector from TD3 into a discrete action dictionary that Craftium can use. 
     def action(self, action):
         """Convert TD3 mapped action-score vector into Craftium action dict."""
-        # Sanity check on input shape. Should be (num_actions + 2,) where last 2 are mouse control.
-        assert action.shape == (self.num_actions + 2,), \
-            f"Expected shape {(self.num_actions + 2,)}, got {action.shape}"
+        # Sanity check on input shape. Should be (num_actions + 4,) where last 4 are mouse control.
+        assert action.shape == (self.num_actions + 4,), \
+            f"Expected shape {(self.num_actions + 4,)}, got {action.shape}"
 
         # Split the input action vector into discrete action scores and mouse control values.
         action_scores = action[:self.num_actions]
-        mouse_vals = action[self.num_actions:self.num_actions + 2]
+        mouse_vals = action[self.num_actions:self.num_actions + 4]
 
         # Fire every action whose score exceeds the threshold. Unlike argmax (which picks
         # exactly one action), this allows simultaneous presses, critical for tasks that
@@ -110,6 +110,7 @@ class ContinuousToDiscreteActionWrapper(gym.ActionWrapper):
 def make_env(
     env_id,
     method,
+    td3_action_names,
     td3_action_threshold,
     frameskip,
     sync_mode,
@@ -135,12 +136,12 @@ def make_env(
         # That wrapper expects an integer, but our ContinuousToDiscreteActionWrapper outputs a dict.
         # Unwrapping gives us CraftiumEnv directly (accepts dict actions), then we layer our
         # wrappers on top.
-        if method == "td3":
+        if method.startswith("td3"):
             base_env = env.unwrapped  # strip DiscreteActionWrapper and any other registered wrappers
             env = FixObsSpaceWrapper(base_env)
             env = ContinuousToDiscreteActionWrapper(
                 env,
-                action_names=env.action_space,
+                action_names=td3_action_names,
                 action_threshold=td3_action_threshold,
             )
         else:
