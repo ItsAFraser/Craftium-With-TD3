@@ -28,10 +28,11 @@ METHODS = [
     "a2c"
 ]
 # Hardcoded action spaces for TD3. "nop" is not here since Craftium handles it automatically when no other actions are specified
-# Taken from craftium docs (mouse control is always 4 here so it is not specified)
+# Taken from craftium docs (mouse control is always 4 for these tasks so it is not specified which is why Room and Small Room aren't here)
 ACTION_SPACES = {
     "Craftium/ChopTree-v0": ["forward", "jump", "dig"],
-    "Craftium/Speleo-v0": ["forward", "jump"]
+    "Craftium/Speleo-v0": ["forward", "jump"],
+    "Craftium/SpidersAttack-v0": ["forward", "left", "right", "jump", "dig"]
 }
 
 # TD3 Constants
