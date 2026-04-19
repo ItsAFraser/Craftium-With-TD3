@@ -14,7 +14,7 @@ import os
 import craftium # This import is used even though the VSCode says it isn't!
 
 from td3_gumbel_policy import GumbelMapperTD3Policy
-from utils import make_env
+from utils import make_env, plot_experiment
 
 # General Constants
 NUMBER_OF_ENVS = 1
@@ -71,10 +71,9 @@ def main():
     if not td3_action_names:
         raise ValueError("td3_action_names must include at least one action")
 
+    # Generate a unique directory name if not provided
+    runs_dir = args.runs_dir if args.runs_dir != "./run-logs/" else f"./run-logs/{uuid4()}"
     for method in METHODS:
-        # Generate a unique directory name if not provided
-        runs_dir = args.runs_dir if args.runs_dir != "./run-logs/" else f"./run-logs/{uuid4()}"
-
         # configure SB3 logger
         log_path = os.path.join(runs_dir, method) # save logs in runs_dir/run_name
         new_logger = logger.configure(log_path, ["stdout", "csv"])  # log to both console and CSV file for later analysis
@@ -126,6 +125,10 @@ def main():
         model.set_logger(new_logger)
         model.learn(total_timesteps=args.total_timesteps)
         envs.close()
+
+    # plot results
+    env_name = args.env_id.split("/")[-1].replace("-v0", "")
+    plot_experiment(runs_dir, METHODS, f"{env_name} Training Curves ({args.total_timesteps/1000}k timesteps)")
 
 if __name__ == "__main__":
     main()

@@ -162,3 +162,44 @@ def make_env(
 
         return env
     return _init
+
+def plot_experiment(dir, methods, plot_title="Training Curves"):
+    """Utility function to plot training curves from SB3 CSV logs for multiple methods."""
+    plt.figure(figsize=(12, 8))
+    for method in methods:
+        log_path = os.path.join(dir, method, "progress.csv")
+        if not os.path.exists(log_path):
+            print(f"Warning: log file {log_path} not found, skipping {method}")
+            continue
+        data = np.genfromtxt(log_path, delimiter=",", skip_header=1)
+
+        # search for "timesteps" and "reward" columns in the header to get the correct indices
+        with open(log_path, "r") as f:
+            header = f.readline().strip().split(",")
+        try:
+            timesteps_idx = header.index("time/total_timesteps")
+            reward_idx = header.index("rollout/ep_rew_mean")
+        except ValueError as e:
+            print(f"Error: Column not found in {log_path}: {e}")
+            continue
+        timesteps = data[:, timesteps_idx]
+        rewards = data[:, reward_idx]
+        plt.plot(timesteps, rewards, label=method)
+    plt.xlim(0, None)
+    plt.xlabel("Timesteps")
+    plt.ylabel("Average Episode Reward")
+    plt.title(plot_title)
+    plt.legend()
+    plt.grid()
+    plt.show()
+    plt.savefig(os.path.join(dir, f"{plot_title.lower().replace(' ', '_')}.png"))
+
+METHODS = [
+    "td3-gumbel",
+    "ppo",
+    "a2c"
+]
+
+if __name__ == "__main__":
+    # use this to plot training curves after running experiments
+    plot_experiment("./run-logs/Speleo-50k", METHODS, "Speleo Training Curves (50k timesteps)")
