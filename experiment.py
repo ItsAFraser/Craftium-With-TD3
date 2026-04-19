@@ -32,7 +32,8 @@ METHODS = [
 ACTION_SPACES = {
     "Craftium/ChopTree-v0": ["forward", "jump", "dig"],
     "Craftium/Speleo-v0": ["forward", "jump"],
-    "Craftium/SpidersAttack-v0": ["forward", "left", "right", "jump", "dig"]
+    "Craftium/SpidersAttack-v0": ["forward", "left", "right", "jump", "dig"],
+    "Craftium/ProcDungeons-v0": ["forward", "left", "right", "jump", "dig"]
 }
 
 # TD3 Constants

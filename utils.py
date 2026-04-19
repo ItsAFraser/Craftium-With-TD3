@@ -4,6 +4,7 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 import matplotlib.pyplot as plt
+import craftium
 
 '''
 This gym wrapper is in part derived from this tutorial/learning resource:
@@ -129,7 +130,18 @@ def make_env(
             fps_max=fps_max,
         )
         
+        # NOTE: ModuleNotFoundError occurs for craftium.extra so precedural can't be done atm
+        # check if this env_id is procedural dungeon env
+        # if env_id == "Craftium/ProcDungeons-v0":
+        #     # Generate a random map using RandomMapGen and pass it to make_dungeon_env
+        #     from craftium.extra.random_map_generator import RandomMapGen
+        #     mapgen = RandomMapGen(n_rooms=10)
+        #     ascii_map = mapgen.rasterize(wall_height=7)
+        #     env = craftium.make_dungeon_env(ascii_map)
+        # else:
+        #     env = gym.make(env_id, **craftium_kwargs)
         env = gym.make(env_id, **craftium_kwargs)
+
         # Uncomment this for saving observations to file! Be warned it takes up quite a bit of space!
         # env = ObservationSaverWrapper(env)
         # For TD3, bypass the DiscreteActionWrapper that Craftium bakes into its registered envs.
