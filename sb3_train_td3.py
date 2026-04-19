@@ -10,6 +10,11 @@ from uuid import uuid4
 import os
 import craftium # This import is used even though the VSCode says it isn't!
 import matplotlib.pyplot as plt
+import torch
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print("torch device:", device)
+print("cuda available:", torch.cuda.is_available())
 
 def parse_args():
     parser = ArgumentParser()
@@ -27,7 +32,7 @@ def parse_args():
     parser.add_argument("--num-envs", type=int, default=4,
         help="Number of environments to use.")
     # Adding td3 as an option here
-    parser.add_argument("--method", type=str, default="a2c", choices=["ppo", "a2c", "td3"],
+    parser.add_argument("--method", type=str, default="td3", choices=["ppo", "a2c", "td3"],
         help="RL method to use to optimize the agent.")
     # fmt: on
 
@@ -38,9 +43,10 @@ This gym wrapper is in part derived from this tutorial/learning resource:
 https://alexandervandekleut.github.io/gym-wrappers/ 
 '''
 class ObersavtionSaverWrapper(gym.Wrapper): # TODO: Is gym.ObservationWrapper better?
-    def __init__(self, env):
+    def __init__(self, env, env_index):
         super().__init__(env)
         self.steps = 0 # Used in step() below
+        self.env_index = env_index
         os.makedirs("results", exist_ok=True)
 
     # This was autofilled by Intellisense, and it works :]
@@ -66,7 +72,8 @@ class ObersavtionSaverWrapper(gym.Wrapper): # TODO: Is gym.ObservationWrapper be
         plt.clf() # Some of the observations seemed to be overlaying each other without this, so I'm force-clearing here
         plt.imshow(obs)
         plt.axis("off")
-        plt.savefig(f"results/observation_{self.steps}.png")
+        os.makedirs(f"results/env{self.env_index}", exist_ok=True)
+        plt.savefig(f"results/env{self.env_index}/{self.env_index}_observation_{self.steps}.png")
 
 '''
 This gym wrapper is in part derived from this tutorial/learning resource:
@@ -85,16 +92,24 @@ class RoomActionSpaceConversionWrapper(gym.ActionWrapper):
         # Basically discretizing the direct output of TD3. TODO: This is not using the mean/variance idea that Alex
         # was talking about, but I can't figure out how to hijack the SB3 implementation to do more than this. Talk
         # to Alex and Ben about that!
-        if z < -0.5:
+        if z < -0.75:
             return 0
-        elif z < 0.0:
+        elif z < -0.5:
             return 1
-        elif z < 0.5:
+        elif z < -0.25:
             return 2
-        else:
+        elif z < 0:
             return 3
+        elif z < 0.25:
+            return 4
+        elif z < 0.5:
+            return 5
+        elif z < 0.75:
+            return 6
+        else:
+            return 7
 
-def make_env(env_id, method):
+def make_env(env_id, method, env_index):
     def _init():
         # set up the environment
         craftium_kwargs = dict(
@@ -105,7 +120,7 @@ def make_env(env_id, method):
         
         env = gym.make(env_id, **craftium_kwargs)
         # Uncomment this for saving observations to file! Be warned it takes up quite a bit of space!
-        # env = ObersavtionSaverWrapper(env)
+        env = ObersavtionSaverWrapper(env, env_index)
         # Maybe a bit hacky, but this specially handles TD3 since it needs a special wrapper.
         # TODO: Will need a smarter way to do this for the various Discrete action space sizes
         if method == "td3":
@@ -128,7 +143,7 @@ if __name__ == "__main__":
     print(f"** Storing run's data in {log_path}")
     new_logger = logger.configure(log_path, ["stdout", "csv"])
 
-    envs = DummyVecEnv([make_env(args.env_id, args.method) for _ in range(args.num_envs)])
+    envs = DummyVecEnv([make_env(args.env_id, args.method, i) for i in range(args.num_envs)])
     envs = VecFrameStack(envs, 3)
     envs = VecMonitor(envs)
 
@@ -158,6 +173,7 @@ if __name__ == "__main__":
             batch_size = 64,
             train_freq = 1,
             gradient_steps = 1,
+            device="cuda",
         )
     model.set_logger(new_logger)
 
