@@ -23,8 +23,8 @@ SYNC_MODE = False
 FPS_MAX = 200
 FRAME_STACK = 2
 METHODS = [
-    "td3-gumbel",
-    "ppo",
+    #"td3-gumbel",
+    #"ppo",
     "a2c"
 ]
 # Hardcoded action spaces for TD3. "nop" is not here since Craftium handles it automatically when no other actions are specified
