@@ -71,6 +71,8 @@ def parse_args():
         help="How often to print BC pretraining loss.")
     parser.add_argument("--bc-demo-file", type=str, default=None,
         help="Optional .npz file with demo_obs and demo_actions arrays for BC warm-start.")
+    parser.add_argument("--custom-map", type=str, default=None,
+        help="Optional filename in custom-maps/ to use as the ascii map for ProcDungeons-v0.")
     # fmt: on
 
     return parser.parse_args()
@@ -194,6 +196,7 @@ def make_env(
     frameskip,
     sync_mode,
     fps_max,
+    ascii_map=None
 ):
     '''
     Factory function to create environment initializer with appropriate wrappers based on method (PPO, A2C, or TD3).
@@ -208,7 +211,28 @@ def make_env(
             fps_max=fps_max,
         )
         
-        env = gym.make(env_id, **craftium_kwargs)
+        if ascii_map is None:
+            env = gym.make(env_id, **craftium_kwargs)
+        else:
+            # Most of this environment creation logic comes from here:
+            # https://craftium.readthedocs.io/en/latest/environments/#procedural-environment-generation
+            env = gym.make(
+                "Craftium/ProcDungeons-v0",
+                minetest_conf=dict(
+                    give_initial_stuff=False,
+                    performance_tradeoffs=True,
+                    monster_type_a="mobs_monster:sand_monster",
+                    monster_type_b="mobs_monster:spider",
+                    monster_type_c="mobs_monster:stone_monster",
+                    monster_type_d="mobs_monster:mese_monster",
+                    wall_material="default:steelblock",
+                    objective_item="default:diamond",
+                    rwd_objective=100.0,
+                    rwd_kill_monster=1.0,
+                    ascii_map=ascii_map.replace("\n", "\\n"),
+                ),
+                **craftium_kwargs,
+            )
         # Uncomment this for saving observations to file! Be warned it takes up quite a bit of space!
         # env = ObservationSaverWrapper(env)
         # For TD3, bypass the DiscreteActionWrapper that Craftium bakes into its registered envs.
@@ -351,6 +375,11 @@ def load_bc_demo_file(demo_file: str):
         )
     return demo_obs, demo_actions
 
+def load_custom_map(name):
+    with open(f"custom-maps/{name}", "r") as f:
+        ascii_map = f.read()
+    return ascii_map
+
 #Main training Loop. Configures the logger, creates the vectorized environment with the appropriate wrappers
 #initializes the model based on a specific method (PPO., A2C, or TD3), and starts the learning process for a given number ot timesteps.
 if __name__ == "__main__":
@@ -371,6 +400,10 @@ if __name__ == "__main__":
     new_logger = logger.configure(log_path, ["stdout", "csv"])  # log to both console and CSV file for later analysis
 
     print(f"Using method {args.method} with {args.total_timesteps} timesteps")
+    ascii_map = None
+    if args.custom_map is not None:
+        print(f"Using custom map {args.custom_map} for ProcDungeons-v0")
+        ascii_map = load_custom_map(args.custom_map)
     envs = DummyVecEnv([
         make_env(
             args.env_id,
@@ -380,6 +413,7 @@ if __name__ == "__main__":
             frameskip=args.frameskip,
             sync_mode=args.sync_mode,
             fps_max=args.fps_max,
+            ascii_map=ascii_map
         )
         for _ in range(args.num_envs)
     ]) # Create a vectorized environment with the specified number of parallel environments, each initialized with the appropriate wrappers based on the method.
