@@ -202,4 +202,4 @@ METHODS = [
 
 if __name__ == "__main__":
     # use this to plot training curves after running experiments
-    plot_experiment("./run-logs/Speleo-50k", METHODS, "Speleo Training Curves (50k timesteps)")
+    plot_experiment("./run-logs/SpidersAttack-1_000k", METHODS, "SpidersAttack Training Curves (1M timesteps)")
